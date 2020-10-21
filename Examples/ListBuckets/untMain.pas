@@ -36,7 +36,7 @@ var
 
 implementation
 
-uses System.DateUtils, System.NetEncoding, System.Hash, Net.HttpClient;
+uses System.DateUtils, System.NetEncoding, System.Hash, Net.HttpClient, ksAwsBase;
 
 const
   //  Note. You'll need to add your public/secret credentials in to the
