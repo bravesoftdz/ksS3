@@ -3,8 +3,7 @@ program ListBuckets;
 uses
   Vcl.Forms,
   untMain in 'untMain.pas' {Form10},
-  ksAwsS3 in '..\..\ksAwsS3.pas',
-  synacode in '..\..\synacode.pas';
+  ksAwsS3 in '..\..\ksAwsS3.pas';
 
 {$R *.res}
 
