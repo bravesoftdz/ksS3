@@ -51,6 +51,7 @@ type
     function GetObject(ABucketName, AObjectName: string): IksAwsS3Object;
     procedure GetBuckets(ABuckets: TStrings);
     procedure GetBucket(ABucketName: string; AContents: TStrings);
+    procedure CreateBucket(ABucketName: string);
   end;
 
   function CreateAwsS3(APublicKey, APrivateKey: string; ARegion: TksS3Region): IksAwsS3;
@@ -58,7 +59,7 @@ type
 implementation
 
 uses ksAwsConst, SysUtils, System.DateUtils, Net.UrlClient, Net.HttpClient, System.Hash, HttpApp,
-  System.NetEncoding, Xml.xmldom, Xml.XMLIntf, Xml.XMLDoc;
+  System.NetEncoding, Xml.xmldom, Xml.XMLIntf, Xml.XMLDoc, ksAwsHash;
 
 type
   TksAwsS3Object = class(TInterfacedObject, IksAwsS3Object)
@@ -97,13 +98,14 @@ type
   TksAwsS3 = class(TksAwsBaseService, IksAwsS3)
   private
     function PerformGetRequest(ABucket, AObj: string; const AStream: TStream = nil) : IHttpResponse;
+    function PerformPutRequest(ABucket, AObj: string; const AStream: TStream = nil) : IHttpResponse;
   protected
     function GetHost(AParams: TStrings): string; override;
     function GetServiceName: string; override;
     function GetObject(ABucketName, AObjectName: string): IksAwsS3Object;
     procedure GetBuckets(AStrings: TStrings);
     procedure GetBucket(ABucketName: string; AStrings: TStrings);
-
+    procedure CreateBucket(ABucketName: string);
   end;
 
 
@@ -173,6 +175,11 @@ end;
 
 { TksAwsS3 }
 
+
+procedure TksAwsS3.CreateBucket(ABucketName: string);
+begin
+  PerformPutRequest(ABucketName, '');
+end;
 
 procedure TksAwsS3.GetBucket(ABucketName: string; AStrings: TStrings);
 var
@@ -264,20 +271,48 @@ end;
 function TksAwsS3.PerformGetRequest(ABucket, AObj: string; const AStream: TStream = nil): IHttpResponse;
 var
   AUrl: string;
-  ARequestTime: TDateTime;
   AParams: TStrings;
 begin
-  ARequestTime := Now;
   AUrl := GenerateUrl(ABucket, AObj);
   AParams := TStringList.Create;
   try
     AParams.Values['bucket'] := ABucket;
     AParams.Values['object'] := AObj;
-      SetHttpHeaders(ARequestTime, AParams);
+    SetHttpHeaders(AParams);
   finally
     AParams.Free;
   end;
   Result := FHttp.Get(AURL, AStream);
+  if AStream <> nil then
+    AStream.Position := 0;
+end;
+
+function TksAwsS3.PerformPutRequest(ABucket, AObj: string; const AStream: TStream): IHttpResponse;
+var
+  AUrl: string;
+  AParams: TStrings;
+  AContent: TStringStream;
+
+begin
+  AUrl := GenerateUrl(ABucket, AObj);
+  AParams := TStringList.Create;
+  try
+    AParams.Values['bucket'] := ABucket;
+    SetHttpHeaders(AParams);
+  finally
+    AParams.Free;
+  end;
+
+  AContent := TStringStream.Create('<CreateBucketConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">' +
+                '<LocationConstraint>' + RegionStr + '</LocationConstraint>' +
+                '</CreateBucketConfiguration>');
+  AContent.position := 0;
+  FHttp.CustomHeaders['x-amz-content-sha256'] :=  GetHashSHA256Hex(AContent.DataString);
+  FHttp.CustomHeaders['Content-Length'] := IntToStr(AContent.Size);
+  FHttp.CustomHeaders['Content-Type'] := 'application/x-www-form-urlencoded; charset=utf-8';
+
+
+  Result := FHttp.Put(AURL, AContent);
   if AStream <> nil then
     AStream.Position := 0;
 end;
