@@ -29,33 +29,33 @@ interface
 uses Net.HttpClient, Net.UrlClient, Classes;
 
 type
-  TksS3Region = (s3EuCentral1, s3EuNorth1, s3EuSouth1, s3EuWest1, s3EuWest2, s3EuWest3, s3UsEast1, s3UsEast2, s3UsWest1, s3UsWest2);
+  TksAwsRegion = (awsEuCentral1, awsEuNorth1, awsEuSouth1, awsEuWest1, awsEuWest2, awsEuWest3, awsUsEast1, awsUsEast2, awsUsWest1, awsUsWest2);
 
   TksAwsBaseService = class(TInterfacedObject)
   private
     FPublicKey: string;
     FPrivateKey: string;
-    FRegion: TksS3Region;
+    FRegion: TksAwsRegion;
     function GetRegionStr: string;
     procedure DoValidateCert(const Sender: TObject; const ARequest: TURLRequest; const Certificate: TCertificate; var Accepted: Boolean);
+    procedure GetHeaders(AHost, APayload: string; AHeaders: TStrings; var ADelimited: string);
+    function GetUrl(AHost, APath: string; AParams: TStrings): string;
   protected
-    FHttp: THTTPClient;
-    function GetHost(AParams: TStrings): string; virtual;
+    function GetHost: string; virtual;
+    function GetPayload(AStr: string): string;
     function GenerateUrl(ASubDomain, APath: string): string;
-    function GetStringToSign(AHost, APath: string): string;
     function GetServiceName: string; virtual; abstract;
-    function GenerateCanonicalRequest(AHost, ADate, APath: string): string;
-    function GenerateSignature(AStrToSign: string): string;
-    procedure SetHttpHeaders(AParams: TStrings);
+    function GenerateCanonicalRequest(AVerb, AHost, URI, APayload: string; AHeaders, AQueryValues: TStrings): string; overload;
+    function GenerateSignature(ANow: TDateTime; AStrToSign: string): string;
+    function ExecuteHttp(AVerb, AHost, APath, APayload: string; AExtraHeaders, AParams: TStrings): IHttpResponse;
   public
-    constructor Create(APublicKey, APrivateKey: string; ARegion: TksS3Region);
-    destructor Destroy; override;
+    constructor Create(APublicKey, APrivateKey: string; ARegion: TksAwsRegion);
     property PublicKey: string read FPublicKey;
     property PrivateKey: string read FPrivateKey;
-    property Region: TksS3Region read FRegion;
+    property Region: TksAwsRegion read FRegion;
     property RegionStr: string read GetRegionStr;
     property ServiceName: string read GetServiceName;
-    //property Host: string read GetHost;
+    property Host: string read GetHost;
   end;
 
 implementation
@@ -64,21 +64,30 @@ uses ksAwsConst, ksAwsHash, SysUtils, System.Hash, System.NetEncoding, DateUtils
 
 { TksAwsBaseService }
 
-constructor TksAwsBaseService.Create(APublicKey, APrivateKey: string;
-  ARegion: TksS3Region);
+constructor TksAwsBaseService.Create(APublicKey, APrivateKey: string; ARegion: TksAwsRegion);
 begin
   inherited Create;
-  FHttp := THTTPClient.Create;
   FPublicKey := APublicKey;
   FPrivateKey := APrivateKey;
   FRegion := ARegion;
-  FHttp.OnValidateServerCertificate := DoValidateCert;
 end;
 
-destructor TksAwsBaseService.Destroy;
+function TksAwsBaseService.GetUrl(AHost, APath: string; AParams: TStrings): string;
+var
+  ICount: integer;
 begin
-  FHttp.Free;
-  inherited;
+  Result := C_PROTOCOL+'://'+AHost+APath;
+  if AParams <> nil then
+  begin
+    for ICount := 0 to AParams.Count-1 do
+    begin
+      if ICount = 0 then
+        Result := Result + '?'
+      else
+        Result := Result + '&';
+      Result := Result + AParams.Names[ICount]+'='+AParams.ValueFromIndex[ICount];
+    end;
+  end;
 end;
 
 procedure TksAwsBaseService.DoValidateCert(const Sender: TObject;
@@ -97,12 +106,10 @@ begin
     Result := Result + TNetEncoding.URL.Encode(APath, [Ord('#')], []);
 end;
 
-function TksAwsBaseService.GenerateSignature(AStrToSign: string): string;
+function TksAwsBaseService.GenerateSignature(ANow: TDateTime; AStrToSign: string): string;
 var
   ADateKey, ARegionKey, AServiceKey, ASigningKey: TArray<Byte>;
-  ANow: TDateTime;
 begin
-  ANow := Now;
   ADateKey := CalculateHMACSHA256(FormatDateTime(C_SHORT_DATE_FORMAT, ANow), TEncoding.UTF8.GetBytes('AWS4' + PrivateKey));
   ARegionKey := CalculateHMACSHA256(RegionStr, ADateKey);
   AServiceKey := CalculateHMACSHA256(ServiceName, ARegionKey);
@@ -110,70 +117,139 @@ begin
   Result := CalculateHMACSHA256Hex(AStrToSign, ASigningKey);
 end;
 
-function TksAwsBaseService.GenerateCanonicalRequest(AHost, ADate, APath: string): string;
+function TksAwsBaseService.GenerateCanonicalRequest(AVerb, AHost, URI, APayload: string; AHeaders, AQueryValues: TStrings): string;
+var
+  ICount:
+  integer;
+  AHash: string;
 begin
-  Result := TNetEncoding.URL.Encode('GET') +#10;
-  Result := Result + '/' + TNetEncoding.URL.Encode(APath, [Ord('#')], []) +#10+#10;
-  Result := Result + 'host:' + Trim(TNetEncoding.URL.Encode(AHost)) +#10+
-                     'x-amz-content-sha256:' + C_EMPTY_HASH +#10+
-                     'x-amz-date:' + Trim(ADate) +#10;
-  Result := Result + #10+'host;x-amz-content-sha256;x-amz-date' +#10;
-  Result := Result + C_EMPTY_HASH;
+  AHash := GetHashSHA256Hex(APayload);
+  Result := TNetEncoding.URL.Encode(AVerb) +C_LF;
+  Result := Result + TNetEncoding.URL.Encode(URI, [Ord('#')], []) +C_LF;
+  if AQueryValues <> nil then
+  begin
+    (AQueryValues as TStringList).Sort;
+    for ICount := 0 to AQueryValues.Count-1 do
+    begin
+      Result := Result + TNetEncoding.URL.Encode(AQueryValues.Names[ICount])+'='+TNetEncoding.URL.Encode(AQueryValues.ValueFromIndex[ICount]);
+      if ICount < AQueryValues.Count-1 then Result := Result + '&';
+    end;
+  end;
+  Result := Result + C_LF;;
+  for ICount := 0 to AHeaders.Count-1 do
+    Result := Result + AHeaders.Names[ICount]+':'+AHeaders.ValueFromIndex[ICount]+C_LF;
+  Result := Result + C_LF;
+  for ICount := 0 to AHeaders.Count-1 do
+  begin
+    Result := Result + AHeaders.Names[ICount];
+    if ICount < AHeaders.Count-1 then
+      Result := Result + ';';
+  end;
+  Result := Result + C_LF;
+  Result := Result +GetHashSHA256Hex(APayload);
 end;
 
-function TksAwsBaseService.GetHost(AParams: TStrings): string;
+procedure TksAwsBaseService.GetHeaders(AHost, APayload: string; AHeaders: TStrings; var ADelimited: string);
+var
+  ICount: integer;
+begin
+  ADelimited := '';
+  AHeaders.Values['host'] := Trim(TNetEncoding.URL.Encode(AHost));
+  AHeaders.Values['x-amz-content-sha256'] := GetHashSHA256Hex(APayload); // apayload
+  AHeaders.Values['x-amz-date'] := FormatDateTime(C_AMZ_DATE_FORMAT, TTimeZone.Local.ToUniversalTime(Now), TFormatSettings.Create('en-US'));
+  (AHeaders as TStringList).Sort;
+  for ICount := 0 to AHeaders.Count-1 do
+  begin
+    ADelimited := ADelimited+AHeaders.Names[ICount];
+    if ICount < AHeaders.Count-1 then
+      ADelimited := ADelimited + ';';
+  end;
+end;
+
+function TksAwsBaseService.GetHost: string;
 begin
   Result := Format('%s.%s.%s', [ServiceName, RegionStr, C_AMAZON_DOMAIN]);
+end;
+
+function TksAwsBaseService.GetPayload(AStr: string): string;
+begin
+  Result := AStr;
+  Result := StringReplace(AStr, '%REGION%', GetRegionStr, [rfReplaceAll]);
 end;
 
 function TksAwsBaseService.GetRegionStr: string;
 begin
   case FRegion of
-    s3EuCentral1: Result := C_S3_RGN_EU_CENTRAL_1;
-    s3EuNorth1  : Result := C_S3_RGN_EU_NORTH_1;
-    s3EuSouth1  : Result := C_S3_RGN_EU_SOUTH_1;
-    s3EuWest1   : Result := C_S3_RGN_EU_WEST_1;
-    s3EuWest2   : Result := C_S3_RGN_EU_WEST_2;
-    s3EuWest3   : Result := C_S3_RGN_EU_WEST_3;
-    s3UsEast1   : Result := C_S3_RGN_US_EAST_1;
-    s3UsEast2   : Result := C_S3_RGN_US_EAST_2;
-    s3UsWest1   : Result := C_S3_RGN_US_WEST_1;
-    s3UsWest2   : Result := C_S3_RGN_US_WEST_2;
+    awsEuCentral1: Result := C_RGN_EU_CENTRAL_1;
+    awsEuNorth1  : Result := C_RGN_EU_NORTH_1;
+    awsEuSouth1  : Result := C_RGN_EU_SOUTH_1;
+    awsEuWest1   : Result := C_RGN_EU_WEST_1;
+    awsEuWest2   : Result := C_RGN_EU_WEST_2;
+    awsEuWest3   : Result := C_RGN_EU_WEST_3;
+    awsUsEast1   : Result := C_RGN_US_EAST_1;
+    awsUsEast2   : Result := C_RGN_US_EAST_2;
+    awsUsWest1   : Result := C_RGN_US_WEST_1;
+    awsUsWest2   : Result := C_RGN_US_WEST_2;
   end;
 end;
 
-
-function TksAwsBaseService.GetStringToSign(AHost, APath: string): string;
+function TksAwsBaseService.ExecuteHttp(AVerb, AHost, APath, APayload: string; AExtraHeaders, AParams: TStrings): IHttpResponse;
 var
+  AHttp: THTTPClient;
+  ICount: integer;
+  AHeaders: TStrings;
+  ACanonical: string;
+  AStringToSign: string;
+  ASignature: string;
   AAmzDate: string;
-  ACanonicalRequest: string;
-  ANow: TDateTime;
-begin
-  ANow := Now;
-  AAmzDate := FormatDateTime(C_AMZ_DATE_FORMAT, TTimeZone.Local.ToUniversalTime(ANow), TFormatSettings.Create('en-US'));
-  ACanonicalRequest := GenerateCanonicalRequest(AHost, AAmzDate, APath);
-  Result := C_HASH_ALGORITHM +C_LF +
-            AAmzDate +C_LF+
-            FormatDateTime(C_SHORT_DATE_FORMAT, ANow) +'/'+ RegionStr +'/'+ ServiceName +'/aws4_request' +C_LF+
-            GetHashSHA256Hex(ACanonicalRequest);
-end;
-
-procedure TksAwsBaseService.SetHttpHeaders(AParams: TStrings);
-var
-  ANow: TDateTime;
   AAuthHeader: string;
+  ANow: TDateTime;
   AShortDate: string;
-  AStrToSign: string;
-  ASig: string;
+  AHash: string;
+  AUrl: string;
+  ADelimitedHeaders: string;
+  AStream: TStringStream;
 begin
-  ANow := Now;
-  AShortDate := FormatDateTime(C_SHORT_DATE_FORMAT, ANow);
-  AStrToSign := GetStringToSign(GetHost(AParams), AParams.Values['object']);
-  ASig := GenerateSignature(AStrToSign);
-  AAuthHeader := C_HASH_ALGORITHM+' Credential='+PublicKey+'/'+AShortDate+'/'+RegionStr+'/'+ServiceName+'/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature='+ASig;
-  FHttp.CustomHeaders['Authorization'] := AAuthHeader;
-  FHttp.CustomHeaders['x-amz-content-sha256'] := C_EMPTY_HASH;
-  FHttp.CustomHeaders['x-amz-date'] := FormatDateTime(C_AMZ_DATE_FORMAT, TTimeZone.Local.ToUniversalTime(ANow), TFormatSettings.Create('en-US'));;
+  AHttp := THTTPClient.Create;
+  AHeaders := TStringList.Create;
+  try
+    AHttp.OnValidateServerCertificate := DoValidateCert;
+    ANow := Now;
+    if Pos('/', APath) <> 1 then
+      APath := '/'+APath;
+    AHash := GetHashSHA256Hex(APayload);
+    if AExtraHeaders <> nil then
+      AHeaders.AddStrings(AExtraHeaders);
+    GetHeaders(AHost, APayload, AHeaders, ADelimitedHeaders);
+    AAmzDate := FormatDateTime(C_AMZ_DATE_FORMAT, TTimeZone.Local.ToUniversalTime(ANow), TFormatSettings.Create('en-US'));
+    AShortDate := FormatDateTime(C_SHORT_DATE_FORMAT, TTimeZone.Local.ToUniversalTime(ANow), TFormatSettings.Create('en-US'));
+    ACanonical := GenerateCanonicalRequest(AVerb, AHost, APath, APayload,AHeaders, AParams);
+    AStringToSign := C_HASH_ALGORITHM +C_LF +
+                     AAmzDate +C_LF+
+                     FormatDateTime(C_SHORT_DATE_FORMAT, ANow) +'/'+ RegionStr +'/'+ ServiceName +'/aws4_request' +C_LF+
+                     GetHashSHA256Hex(ACanonical);
+    ASignature := GenerateSignature(ANow, AStringToSign);
+    AAuthHeader := C_HASH_ALGORITHM+' Credential='+PublicKey+'/'+
+                   FormatDateTime(C_SHORT_DATE_FORMAT, ANow)+'/'+
+                   RegionStr+'/'+
+                   ServiceName+'/'+
+                   'aws4_request,SignedHeaders='+ADelimitedHeaders+',Signature='+ASignature;
+    for ICount := 0 to AHeaders.Count-1 do
+      AHttp.CustomHeaders[AHeaders.Names[ICount]] := AHeaders.ValueFromIndex[ICount];
+    AHttp.CustomHeaders['Authorization'] := AAuthHeader;
+    AUrl := GetUrl(AHost, APath, AParams);
+    AStream := TStringStream.Create(APayload);
+    try
+      if AVerb = C_GET then Result := AHttp.Get(AUrl);
+      if AVerb = C_PUT then Result := AHttp.Put(AUrl, AStream);
+      if AVerb = C_DELETE then Result := AHttp.Delete(AUrl);
+    finally
+      AStream.Free;
+    end;
+  finally
+    AHeaders.Free;
+    AHttp.Free;
+  end;
 end;
 
 end.

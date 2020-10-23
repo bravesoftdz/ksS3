@@ -3,7 +3,7 @@ object Form10: TForm10
   Top = 0
   Caption = 'Form10'
   ClientHeight = 449
-  ClientWidth = 762
+  ClientWidth = 809
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -32,9 +32,6 @@ object Form10: TForm10
     Align = alLeft
     BevelOuter = bvNone
     TabOrder = 0
-    ExplicitLeft = -16
-    ExplicitTop = 47
-    ExplicitHeight = 408
     object Label1: TLabel
       Left = 0
       Top = 0
@@ -64,24 +61,21 @@ object Form10: TForm10
       ItemHeight = 21
       TabOrder = 0
       OnClick = ListBox1Click
-      ExplicitLeft = 4
     end
   end
   object Panel2: TPanel
-    Left = 531
+    Left = 535
     Top = 49
-    Width = 231
+    Width = 274
     Height = 400
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 1
-    ExplicitLeft = 552
-    ExplicitTop = 41
-    ExplicitHeight = 408
+    ExplicitLeft = 488
     object Label2: TLabel
       Left = 0
       Top = 0
-      Width = 231
+      Width = 274
       Height = 35
       Align = alTop
       Alignment = taCenter
@@ -95,35 +89,34 @@ object Form10: TForm10
       ParentFont = False
       Layout = tlCenter
       ExplicitLeft = 6
+      ExplicitWidth = 231
     end
     object ListBox3: TListBox
       Left = 0
       Top = 35
-      Width = 231
+      Width = 274
       Height = 365
       Style = lbOwnerDrawFixed
       Align = alClient
       ItemHeight = 21
       TabOrder = 0
       ExplicitLeft = 6
-      ExplicitHeight = 373
+      ExplicitWidth = 225
     end
   end
   object Panel3: TPanel
     Left = 193
     Top = 49
-    Width = 338
+    Width = 342
     Height = 400
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 2
-    ExplicitLeft = 191
-    ExplicitTop = 41
-    ExplicitHeight = 408
+    ExplicitWidth = 338
     object Label3: TLabel
       Left = 0
       Top = 0
-      Width = 338
+      Width = 342
       Height = 35
       Align = alTop
       Alignment = taCenter
@@ -137,43 +130,41 @@ object Form10: TForm10
       ParentFont = False
       Layout = tlCenter
       ExplicitTop = 8
+      ExplicitWidth = 338
     end
     object ListBox2: TListBox
       Left = 0
       Top = 35
-      Width = 338
+      Width = 342
       Height = 365
       Style = lbOwnerDrawFixed
       Align = alClient
       ItemHeight = 21
       TabOrder = 0
       OnClick = ListBox2Click
-      ExplicitLeft = -6
-      ExplicitTop = 41
-      ExplicitHeight = 373
+      ExplicitWidth = 338
     end
   end
   object Panel4: TPanel
     Left = 0
     Top = 0
-    Width = 762
+    Width = 809
     Height = 49
     Align = alTop
     BevelOuter = bvNone
     BorderWidth = 4
     TabOrder = 3
+    ExplicitWidth = 762
     object Button1: TButton
       Left = 4
       Top = 4
-      Width = 754
+      Width = 801
       Height = 41
       Align = alClient
       Caption = 'List Buckets'
       TabOrder = 0
       OnClick = Button1Click
-      ExplicitLeft = 0
-      ExplicitTop = 8
-      ExplicitWidth = 762
+      ExplicitWidth = 754
     end
   end
 end

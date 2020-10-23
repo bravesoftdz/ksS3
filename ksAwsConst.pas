@@ -27,6 +27,10 @@ unit ksAwsConst;
 interface
 
 const
+  C_GET               = 'GET';
+  C_PUT               = 'PUT';
+  C_DELETE            = 'DELETE';
+  C_AWS_DOMAIN        = 'amazonaws.com';
   C_EMPTY_HASH        = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
   C_LF                = #10;
   C_AMZ_DATE_FORMAT   = 'yyyymmdd"T"hhnnss"Z"';
@@ -34,16 +38,25 @@ const
   C_AMAZON_DOMAIN     = 'amazonaws.com';
   C_HASH_ALGORITHM    = 'AWS4-HMAC-SHA256';
   C_PROTOCOL          = 'https';
-  C_S3_RGN_EU_CENTRAL_1   = 'eu-central-1';
-  C_S3_RGN_EU_NORTH_1     = 'eu-north-1';
-  C_S3_RGN_EU_SOUTH_1     = 'eu-south-1';
-  C_S3_RGN_EU_WEST_1      = 'eu-west-1';
-  C_S3_RGN_EU_WEST_2      = 'eu-west-2';
-  C_S3_RGN_EU_WEST_3      = 'eu-west-3';
-  C_S3_RGN_US_EAST_1      = 'us-east-1';
-  C_S3_RGN_US_EAST_2      = 'us-east-2';
-  C_S3_RGN_US_WEST_1      = 'us-west-1';
-  C_S3_RGN_US_WEST_2      = 'us-west-2';
+  C_SERVICE_S3        = 's3';
+
+  C_RGN_EU_CENTRAL_1   = 'eu-central-1';
+  C_RGN_EU_NORTH_1     = 'eu-north-1';
+  C_RGN_EU_SOUTH_1     = 'eu-south-1';
+  C_RGN_EU_WEST_1      = 'eu-west-1';
+  C_RGN_EU_WEST_2      = 'eu-west-2';
+  C_RGN_EU_WEST_3      = 'eu-west-3';
+  C_RGN_US_EAST_1      = 'us-east-1';
+  C_RGN_US_EAST_2      = 'us-east-2';
+  C_RGN_US_WEST_1      = 'us-west-1';
+  C_RGN_US_WEST_2      = 'us-west-2';
+
+
+  // payloads...
+  C_S3_XML_NS             = 'http://s3.amazonaws.com/doc/2006-03-01/';
+  C_REGION                = '%REGION%';
+  C_PAYLOAD_CREATE_BUCKET = '<CreateBucketConfiguration xmlns="'+C_S3_XML_NS+'"><LocationConstraint>'+C_REGION+'</LocationConstraint></CreateBucketConfiguration >';
+
 
 
 implementation

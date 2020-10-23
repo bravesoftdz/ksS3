@@ -42,6 +42,7 @@ const
   //  Note. You'll need to add your public/secret credentials in to the
   //  const values below...
 
+  C_AWS_RGN = awsEuWest1;
   C_YOUR_PUBLIC_KEY = '********************';
   C_YOUR_SECRET_KEY = '****************************************';
 
@@ -57,7 +58,7 @@ end;
 
 procedure TForm10.FormCreate(Sender: TObject);
 begin
-  FAwsS3 := CreateAwsS3(C_YOUR_PUBLIC_KEY, C_YOUR_SECRET_KEY, s3EuWest1);
+  FAwsS3 := CreateAwsS3(C_YOUR_PUBLIC_KEY, C_YOUR_SECRET_KEY, C_AWS_RGN);
 end;
 
 procedure TForm10.ListBox1Click(Sender: TObject);
@@ -79,7 +80,6 @@ begin
   AObject := FAwsS3.GetObject(ABucket, AObjectName);
 
   ListBox3.Items.Add('key: '+AObject.Key);
-  ListBox3.Items.Add('object name: '+AObject.ObjectName);
   ListBox3.Items.Add('size: '+AObject.Size.ToString+' bytes');
   ListBox3.Items.Add('last modified: '+AObject.LastModified);
   ListBox3.Items.Add('ETag: '+AObject.ETag);
