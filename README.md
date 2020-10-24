@@ -1,3 +1,5 @@
+# code has now been merged into https://github.com/gmurt/ksAws
+
 # ksS3
 Simple Delphi interface for Amazon S3 Storage service.
 
